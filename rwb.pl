@@ -352,9 +352,6 @@ if ($action eq "base") {
   #
   print "<div id=\"map\" style=\"width:100\%; height:80\%\"></div>";
   
-  #print h2("$currLat");
-  #print h2("$currLong");
-  
   #
   # And a div to populate with info about nearby stuff
   #
@@ -484,6 +481,13 @@ if ($action eq "near") {
       }
     }
   }
+  
+  my ($commstr) = CommitteesMoney($latne,$longne,$latsw,$longsw,$cycle,$format);
+  my ($indstr) = IndividualsMoney($latne,$longne,$latsw,$longsw,$cycle,$format);
+  my ($opinionstr) = OpinionData($latne,$longne,$latsw,$longsw);
+  print $commstr;
+  print $indstr;
+  print $opinionstr;
 }
 
 
@@ -968,6 +972,192 @@ sub Committees {
       return (MakeRaw("committee_data","2D",@rows),$@);
     }
   }
+}
+
+#
+# Generate a table of nearby committees's transaction amount
+# ($table|$raw,$error) = Committees(latne,longne,latsw,longsw,cycle,format)
+# $error false on success, error string on failure
+#
+sub CommitteesMoney {
+  my ($latne,$longne,$latsw,$longsw,$cycle,$format) = @_;
+  my @rows;
+  my $nearComm;
+  my $transCommDem;
+  my $transCommRep;
+  my $transCandDem;
+  my $transCandRep;
+  my $transCommTot;
+  my $transCandTot;
+  my @rows_comm_to_comm_dem;
+  my @rows_comm_to_comm_rep;
+  my @rows_comm_to_cand_dem;
+  my @rows_comm_to_cand_rep;
+  my @rows_comm_to_comm_tot;
+  my @rows_comm_to_cand_tot;
+  my $demTot;
+  my $repTot;
+  my $totTot;
+  my $repDemTot;
+
+  eval { 
+    # list of all the committees that can be seen in current map
+    $nearComm= "(select cmte_id,cmte_pty_affiliation from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle=$cycle and latitude>$latsw and latitude<$latne and longitude>$longsw and longitude<$longne)";
+    
+    
+    # list of all transactions for cs339.comm_to_comm natural join $nearComm
+    $transCommDem = "(SELECT transaction_amnt FROM CS339.comm_to_comm natural join $nearComm where CMTE_PTY_AFFILIATION = 'DEM')";
+   
+    $transCommRep = "(SELECT transaction_amnt FROM CS339.comm_to_comm natural join $nearComm where CMTE_PTY_AFFILIATION = 'REP')";
+    
+    $transCommTot = "(SELECT transaction_amnt FROM CS339.comm_to_comm natural join $nearComm)";
+    
+    $transCandDem = "(SELECT transaction_amnt FROM CS339.comm_to_cand natural join $nearComm where CMTE_PTY_AFFILIATION = 'DEM')";
+    
+    $transCandRep = "(SELECT transaction_amnt FROM CS339.comm_to_cand natural join $nearComm where CMTE_PTY_AFFILIATION = 'REP')";
+                
+    $transCandTot = "(SELECT transaction_amnt FROM CS339.comm_to_cand natural join $nearComm)";
+    
+    #Sum of all transactions in comm_comm table for democrats
+    @rows_comm_to_comm_dem = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM $transCommDem", "COL");
+    
+    @rows_comm_to_comm_rep = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM $transCommRep", "COL");
+    
+    @rows_comm_to_comm_tot = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM $transCommTot", "COL");
+    
+    @rows_comm_to_cand_dem = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM $transCandDem", "COL");
+    @rows_comm_to_cand_rep = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM $transCandRep", "COL");
+
+    @rows_comm_to_cand_tot = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM $transCandTot", "COL");
+  };
+  $demTot = $rows_comm_to_comm_dem[0] + $rows_comm_to_cand_dem[0];
+  $repTot = $rows_comm_to_comm_rep[0] + $rows_comm_to_cand_rep[0];
+  $repDemTot = $repTot + $demTot;
+  $totTot = $rows_comm_to_comm_tot[0] + $rows_comm_to_cand_tot[0];
+  # winner variable holds rgb value, 
+  my $winner = 'rgb(0,0,0)';
+  my $percentage = 0;
+  my $hexVal;
+  if ($demTot > $repTot)
+  {
+    $percentage = (int(($demTot-$repTot)/$repDemTot)*100);
+    $hexVal = 155+$percentage;
+    #print h2("HEXVAL: ");
+    #print h2($hexVal);
+    $winner = "rgb($hexVal,0,0)";
+  }
+  else
+  {
+    $percentage = (int(($repTot-$demTot)/$repDemTot)*100);
+    $hexVal = 155+$percentage;
+    $winner = "rgb(0,0,$hexVal)";
+  }
+  return "<h3 id ='comm' style='color:$winner'>
+  Committee Money Data <br/>
+  Democratic Committee Total Transaction Amnt: $demTot<br/>
+  Republican Committee Total Transaction Amnt: $repTot<br/>
+  Total transaction ammount regardless of political party: $totTot<br/></h3>";
+}
+
+#
+# Generate a table of nearby individuals's transaction amount
+#
+sub IndividualsMoney {
+  my ($latne,$longne,$latsw,$longsw,$cycle,$format) = @_;
+  my @rows;
+  my $nearComm;
+  my $transCommDem;
+  my $transCommRep;
+  my $transCandDem;
+  my $transCandRep;
+  my @rows_ind_dem;
+  my @rows_ind_rep;
+  my @rows_ind_tot;
+  my $totTot;
+  my $demTot;
+  my $repTot;
+
+  eval { 
+    
+    #Sum of all transactions in comm_comm table for democrats
+    @rows_ind_dem = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM (SELECT transaction_amnt FROM CS339.individual natural join (select cmte_id,cmte_pty_affiliation from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle=$cycle and latitude>$latsw and latitude<$latne and longitude>$longsw and longitude<$longne) where CMTE_PTY_AFFILIATION = 'DEM')", "COL");
+    
+    @rows_ind_rep = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM (SELECT transaction_amnt FROM CS339.individual natural join (select cmte_id,cmte_pty_affiliation from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle=$cycle and latitude>$latsw and latitude<$latne and longitude>$longsw and longitude<$longne) where CMTE_PTY_AFFILIATION = 'REP')", "COL");                             
+    
+    @rows_ind_tot = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM (SELECT transaction_amnt FROM CS339.individual natural join (select cmte_id,cmte_pty_affiliation from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle=$cycle and latitude>$latsw and latitude<$latne and longitude>$longsw and longitude<$longne))", "COL");
+  };
+  $demTot = $rows_ind_dem[0];
+  $repTot = $rows_ind_rep[0];
+  $totTot = $rows_ind_tot[0];
+  my $repDemTot = $demTot + $repTot;
+  my $hexVal;
+  my $percentage;
+  my $winner;
+  if ($demTot > $repTot)
+  {
+    $percentage = (int(($demTot-$repTot)/$repDemTot)*100);
+    $hexVal = 155+$percentage;
+    #print h2("HEXVAL: ");
+    #print h2($hexVal);
+    $winner = "rgb($hexVal,0,0)";
+  }
+  else
+  {
+    $percentage = (int(($repTot-$demTot)/$repDemTot)*100);
+    $hexVal = 155+$percentage;
+    $winner = "rgb(0,0,$hexVal)";
+  }
+  return "<h3 id='ind' style='color:$winner;'>
+  Individual Money Data <br/>
+  Democratic Individual Total Transaction Amnt: $demTot<br/>
+  Republican Individual Total Transaction Amnt: $repTot<br/>
+  Total transaction ammount regardless of political party: $totTot<br/></h3>";
+}
+
+
+#
+# Generate a table of nearby crowdsourced-opinions
+#
+sub OpinionData {
+  my ($latne,$longne,$latsw,$longsw) = @_;
+  my @rows;
+  my $nearComm;
+  my $transCommDem;
+  my $transCommRep;
+  my $transCandDem;
+  my $transCandRep;
+  my @rows_avg;
+  my @rows_std;
+  my $avgTot;
+  my $stdTot;
+
+  eval { 
+    
+    #Sum of all transactions in comm_comm table for democrats
+    @rows_avg = ExecSQL($dbuser, $dbpasswd, "SELECT AVG(COLOR) FROM rwb_opinions WHERE latitude > $latsw and latitude <$latne and longitude >$longsw and longitude <$longne", "COL");
+    
+    @rows_std = ExecSQL($dbuser, $dbpasswd, "SELECT STDDEV(COLOR) FROM rwb_opinions WHERE latitude > $latsw and latitude <$latne and longitude >$longsw and longitude <$longne", "COL");
+  };
+  $avgTot = $rows_avg[0];
+  $stdTot = $rows_std[0];
+
+  my $winner = 'white';
+  if ($avgTot > 0)
+  {
+    $winner = 'blue';
+  }
+  if ($avgTot == 0)
+  {
+    $winner = 'white';
+  }
+  if ($avgTot < 0)
+  {
+    $winner = 'red';
+  }
+  return "<h3 id='opi' style='color:$winner;'>
+  Crowd-Sourced Opinion Data Data where 1 is blue, -1 is red <br/>
+  Average Color: $avgTot<br/>
+  Standard Deviation of Color: $stdTot<br/></h3>";
 }
 
 
