@@ -31,7 +31,6 @@ $(document).ready(function() {
 });
 
 // Global variables
-
 var map, usermark, markers = [],
 
 // UpdateMapById draws markers of a given category (id)
@@ -170,8 +169,7 @@ ViewShift = function() {
 			latsw:	sw.lat(),
 			longsw:	sw.lng(),
 			format:	"raw",
-			what:	"committees,candidates",
-            cycle: 1112
+			what:	"committees,candidates"
 		}, NewData);
 },
 
@@ -190,9 +188,6 @@ Reposition = function(pos) {
 	map.setCenter(new google.maps.LatLng(lat,long));
 // ... and set our user's marker on the map to the new position
 	usermark.setPosition(new google.maps.LatLng(lat,long));
-    
-    document.cookie = "lat="+lat;
-    document.cookie = "long="+long;
 },
 
 
@@ -240,9 +235,6 @@ Start = function(location) {
 	google.maps.event.addListener(map,"bounds_changed",ViewShift);
 	google.maps.event.addListener(map,"center_changed",ViewShift);
 	google.maps.event.addListener(map,"zoom_changed",ViewShift);
-    
-    document.cookie = "lat="+lat;
-    document.cookie = "long="+long;
 
 //
 // Finally, tell the browser that if the current location changes, it
