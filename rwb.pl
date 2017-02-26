@@ -77,8 +77,8 @@ use Time::ParseDate;
 #
 # You need to override these for access to your database
 #
-my $dbuser="con818";
-my $dbpasswd="zukc3TJ4a";
+my $dbuser="chl433";
+my $dbpasswd="zwPlu23Zr";
 
 
 #
@@ -345,6 +345,21 @@ if ($action eq "base") {
   #
   print "<div id=\"map\" style=\"width:100\%; height:80\%\"></div>";
   
+  my @cycleData;
+  eval { @cycleData = ExecSQL($dbuser, $dbpasswd, "select unique cycle from cs339.committee_master order by cycle", "COL"); };
+
+  print start_form(-name=>'selections'),
+        ("Select Cycles: "),
+          popup_menu(-name=>'cycles',
+          -id=>'cyclesNumbers',
+          -multiple=>'true',
+          -values=>[@cycleData],
+          -default=>'1112',
+	  -onclick=>'ViewShift()'),p,
+ checkbox(-name=>'Committees',-id=>'committees_id',-checked=>'true',-onclick=>'ViewShift()'),p,
+ checkbox(-name=>'Individuals', -id=>'individuals_id', -checked=>'true',-onclick=>'ViewShift()'),p,
+ checkbox(-name=>'Candidates', -id=>'candidates_id', -checked=>'true',-onclick=>'ViewShift()'),p,
+  end_form;
   
   #
   # And a div to populate with info about nearby stuff
@@ -360,11 +375,9 @@ if ($action eq "base") {
 
 
 # height=1024 width=1024 id=\"info\" name=\"info\" onload=\"UpdateMap()\"></iframe>";
-  
 
   #
-  # User mods
-  #
+  # User modes  #
   #
   if ($user eq "anon") {
     print "<p>You are anonymous, but you can also <a href=\"rwb.pl?act=login\">login</a></p>";
@@ -713,7 +726,7 @@ sub Committees {
   my ($latne,$longne,$latsw,$longsw,$cycle,$format) = @_;
   my @rows;
   eval { 
-    @rows = ExecSQL($dbuser, $dbpasswd, "select latitude, longitude, cmte_nm, cmte_pty_affiliation, cmte_st1, cmte_st2, cmte_city, cmte_st, cmte_zip from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle=? and latitude>? and latitude<? and longitude>? and longitude<?",undef,$cycle,$latsw,$latne,$longsw,$longne);
+    @rows = ExecSQL($dbuser, $dbpasswd, "select latitude, longitude, cmte_nm, cmte_pty_affiliation, cmte_st1, cmte_st2, cmte_city, cmte_st, cmte_zip from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle in ($cycle) and latitude>? and latitude<? and longitude>? and longitude<?",undef,$latsw,$latne,$longsw,$longne);
   };
   
   if ($@) { 
@@ -739,7 +752,7 @@ sub Candidates {
   my ($latne,$longne,$latsw,$longsw,$cycle,$format) = @_;
   my @rows;
   eval { 
-    @rows = ExecSQL($dbuser, $dbpasswd, "select latitude, longitude, cand_name, cand_pty_affiliation, cand_st1, cand_st2, cand_city, cand_st, cand_zip from cs339.candidate_master natural join cs339.cand_id_to_geo where cycle=? and latitude>? and latitude<? and longitude>? and longitude<?",undef,$cycle,$latsw,$latne,$longsw,$longne);
+    @rows = ExecSQL($dbuser, $dbpasswd, "select latitude, longitude, cand_name, cand_pty_affiliation, cand_st1, cand_st2, cand_city, cand_st, cand_zip from cs339.candidate_master natural join cs339.cand_id_to_geo where cycle in ($cycle) and latitude>? and latitude<? and longitude>? and longitude<?",undef,$latsw,$latne,$longsw,$longne);
   };
   
   if ($@) { 
@@ -768,7 +781,7 @@ sub Individuals {
   my ($latne,$longne,$latsw,$longsw,$cycle,$format) = @_;
   my @rows;
   eval { 
-    @rows = ExecSQL($dbuser, $dbpasswd, "select latitude, longitude, name, city, state, zip_code, employer, transaction_amnt from cs339.individual natural join cs339.ind_to_geo where cycle=? and latitude>? and latitude<? and longitude>? and longitude<?",undef,$cycle,$latsw,$latne,$longsw,$longne);
+    @rows = ExecSQL($dbuser, $dbpasswd, "select latitude, longitude, name, city, state, zip_code, employer, transaction_amnt from cs339.individual natural join cs339.ind_to_geo where cycle in ($cycle) and latitude>? and latitude<? and longitude>? and longitude<?",undef,$latsw,$latne,$longsw,$longne);
   };
   
   if ($@) { 

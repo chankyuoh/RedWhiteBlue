@@ -88,7 +88,7 @@ UpdateMap = function() {
 // division to white and to indicate that we are updating
 	var color = $("#color");
 	color.css("background-color", "white")
-		.html("<b><blink>Updating Display...</blink></b>");
+	    .html("<b><blink>Updating Display...</blink></b>");
 
 // Remove any existing data markers from the map
 	ClearMarkers();
@@ -98,9 +98,9 @@ UpdateMap = function() {
 // commented out...  Those might help with the project...
 //
 	UpdateMapById("committee_data","COMMITTEE");
-	//UpdateMapById("candidate_data","CANDIDATE");
-	//UpdateMapById("individual_data", "INDIVIDUAL");
-	//UpdateMapById("opinion_data","OPINION");
+	UpdateMapById("candidate_data","CANDIDATE");
+	UpdateMapById("individual_data", "INDIVIDUAL");
+	UpdateMapById("opinion_data","OPINION");
 
 // When we're done with the map update, we mark the color division as
 // Ready.
@@ -142,8 +142,8 @@ ViewShift = function() {
 
 // Now we need to update our data based on those bounds
 // first step is to mark the color division as white and to say "Querying"
-	$("#color").css("background-color","white")
-		.html("<b><blink>Querying...("+ne.lat()+","+ne.lng()+") to ("+sw.lat()+","+sw.lng()+")</blink></b>");
+	$("#color").css("background-color","white")    
+              .html("<b><blink>Querying...("+ne.lat()+","+ne.lng()+") to ("+sw.lat()+","+sw.lng()+")</blink></b>");
 
 // Now we make a web request.   Here we are invoking rwb.pl on the 
 // server, passing it the act, latne, etc, parameters for the current
@@ -151,6 +151,71 @@ ViewShift = function() {
 // the browser will also automatically send back the cookie so we keep
 // any authentication state
 // 
+        var datainc="";
+	if ($('#' + "individuals_id").is(":checked")==true)
+	    {
+		if ($('#' + "committees_id").is(":checked")==true)
+		    {
+			if ($('#' + "candidates_id").is(":checked")==true)
+			    {
+				datainc="individuals,committees,candidates";
+			    }
+			else
+			    {
+				datainc="individuals,committees";
+			    }
+		    }
+		else
+		    {
+			if ($('#' + "candidates_id").is(":checked")==true)
+                            {
+				datainc="individuals,candidates";
+                            }
+			else
+                            {
+                                datainc="individuals";
+                            }
+		    }
+	    }
+	else
+	    {
+                if ($('#' + "committees_id").is(":checked")==true)
+                    {
+			if ($('#' + "candidates_id").is(":checked")==true)
+                            {
+				datainc="committees,candidates";
+                            }
+                        else
+                            {
+                                datainc="committees";
+                            }
+                    }
+                else
+                    {
+                        if ($('#' + "candidates_id").is(":checked")==true)
+			    {
+                                datainc="candidates";
+			    }
+                        else
+                            {
+                                datainc="";
+                            }
+                    }
+
+	    }
+
+	var cyclesNumbersString="8182,1112";
+	var tempArray=[];
+	var tempElement=document.getElementById("cyclesNumbers");
+	for (n=0;n<tempElement.options.length;n++)
+	{
+	    if (tempElement.options[n].selected==true)
+	    {
+		tempArray.push(tempElement.options[n].value);
+	    }
+	}
+        cyclesNumbersString=tempArray.join();	
+
 // This *initiates* the request back to the server.  When it is done,
 // the browser will call us back at the function NewData (given above)
 	$.get("rwb.pl",
@@ -161,7 +226,8 @@ ViewShift = function() {
 			latsw:	sw.lat(),
 			longsw:	sw.lng(),
 			format:	"raw",
-			what:	"committees,candidates"
+			what:	datainc,
+			cycle: cyclesNumbersString
 		}, NewData);
 },
 
