@@ -54,6 +54,7 @@ use strict;
 use CGI qw(:standard);
 
 
+
 # The interface to the database.  The interface is essentially
 # the same no matter what the backend database is.  
 #
@@ -98,10 +99,17 @@ my $cookiename="RWBSession";
 my $debugcookiename="RWBDebug";
 
 #
+# Cookie for current location for giving opinion
+#
+my $latcookiename="lat";
+my $longcookiename="long";
+#
 # Get the session input and debug cookies, if any
 #
 my $inputcookiecontent = cookie($cookiename);
 my $inputdebugcookiecontent = cookie($debugcookiename);
+my $inputlatcookiecontent = cookie($latcookiename);
+my $inputlongcookiecontent = cookie($longcookiename);
 
 #
 # Will be filled in as we process the cookies and paramters
@@ -311,7 +319,6 @@ if ($action eq "login") {
 }
 
 
-
 #
 # BASE
 #
@@ -340,7 +347,6 @@ if ($action eq "base") {
   print "<div id=\"color\" style=\"width:100\%; height:10\%\"></div>";
   
   
-  
 
   #
   #
@@ -349,6 +355,9 @@ if ($action eq "base") {
   print "<div id=\"map\" style=\"width:100\%; height:80\%\"></div>";
   
   
+ print "<div id=\"comm\" style=\"width:100\%; height:10\%\">hello</div>";
+  
+
   # And a div to populate with info about nearby stuff
   #
   #
@@ -359,7 +368,9 @@ if ($action eq "base") {
     # invisible otherwise
     print "<div id=\"data\" style=\"display: none;\"></div>";
   }
-
+  
+  
+  
 
 # height=1024 width=1024 id=\"info\" name=\"info\" onload=\"UpdateMap()\"></iframe>";
   
@@ -394,6 +405,9 @@ if ($action eq "base") {
 
 }
 
+
+
+
 #
 #
 # NEAR
@@ -421,7 +435,7 @@ if ($action eq "near") {
   
   $format = "table" if !defined($format);
   $cycle = "1112" if !defined($cycle);
-
+  $whatparam = "all";
   if (!defined($whatparam) || $whatparam eq "all") { 
     %what = ( committees => 1, 
 	      candidates => 1,
@@ -472,27 +486,83 @@ if ($action eq "near") {
       }
     }
   }
-<<<<<<< HEAD
-  #commented out for now b/c causing crash
-  #my ($commstr) = CommitteesMoney($latne,$longne,$latsw,$longsw,$cycle,$format);
-  #my ($indstr) = IndividualsMoney($latne,$longne,$latsw,$longsw,$cycle,$format);
+  
+  my ($commstr) = CommitteesMoney($latne,$longne,$latsw,$longsw,$cycle,$format);
+  my ($indstr) = IndividualsMoney($latne,$longne,$latsw,$longsw,$cycle,$format);
   my ($opinionstr) = OpinionData($latne,$longne,$latsw,$longsw);
-  #print $commstr;
-
-  #print $indstr;
+  print $commstr;
+  print $indstr;
   print $opinionstr;
-=======
->>>>>>> 18a16f063d4b41801917f69f027f38c3f592b5af
 }
 
 
-if ($action eq "invite-user") { 
-  print h2("Invite User Functionality Is Unimplemented");
-}
+#
+# GIVE-OPINION-DATA
+#
+# Give User Opinion functionaltiy 
+#
+#
+#
+#
 
 if ($action eq "give-opinion-data") { 
-  print h2("Giving Location Opinion Data Is Unimplemented");
+
+  print h2("Give your opinion of the political standings in your current location");
+  print h2('input a number value ranging from -1 (meaning RED) to 1 (meaning BLUE), or 0 meaning NEUTRAL');
+  my $lat;
+  my $long;
+  if (defined($inputlatcookiecontent) && defined($inputlongcookiecontent))
+  {
+    $lat = $inputlatcookiecontent;
+    $long = $inputlongcookiecontent;
+  }
+  my $color = param('color');
+  if (defined($color))
+  {
+    if ($color > 1 || $color < -1)
+    {
+        print h2('ERROR: Invalid input. Please input a number ranging from -1 to 1');
+        $run = 0;
+    }
+  }
+    if (!UserCan($user,"give-opinion-data")) 
+    { 
+    print h2('You do not have the required permissions to give opinion data.');
+    } 
+    else 
+    {
+    if (!$run) 
+    { 
+      print start_form(-name=>'GiveOpinion'),
+	h2('Give Opinion'),
+	  "color: ", textfield(-name=>'color'),
+	    p,
+	      hidden(-name=>'run',-default=>['1']),
+		hidden(-name=>'act',-default=>['give-opinion-data']),
+		  submit,
+		    end_form,
+		      hr;
+    }
+    else 
+    {
+      my $error;
+      $error=UserGiveOpinion($user,$color,$lat,$long);
+      if ($error) 
+      { 
+	       print "Can't give user opinion because: $error";
+      } 
+      else 
+        {
+	       print "You successfully provided input at latitude: $lat longitude: $long!\n";
+        }
+    }
+    }
+  
+  
+  print "<p><a href=\"rwb.pl?act=base&run=1\">Return</a></p>";
 }
+
+
 
 if ($action eq "give-cs-ind-data") { 
   print h2("Giving Crowd-sourced Individual Geolocations Is Unimplemented");
@@ -507,9 +577,103 @@ if ($action eq "give-cs-ind-data") {
 #
 #
 if ($action eq "add-user") { 
-  if (!UserCan($user,"add-users") && !UserCan($user,"manage-users")) { 
+  
+  my $special = param('special');
+  my $refer = param('refer');
+  my $firstPart = "https://murphy.wot.eecs.northwestern.edu/~con818/rwb/rwb.pl?act=add-user&special=";
+  my $uniqueLink = "$firstPart$special";
+  $uniqueLink = "$uniqueLink&refer=$refer";
+  my @rows;
+  print h2("your unique link: $uniqueLink");
+  if (defined($special))
+  {
+     #print h2("uniqueLink");
+     eval { @rows = ExecSQL($dbuser, $dbpasswd, "select name from rwb_links WHERE name='$uniqueLink'", "COL"); }; 
+     if (scalar(@rows)==0)
+     {
+        #print h2("$uniqueLink");
+        print h2('your unique link is not valid');
+     }
+     else
+     {
+        print h2("you got a valid unique Link");
+        #print h2(@rows);
+     }
+   }
+   else
+   {
+      print h2("special is not specified, aka not a one time link");
+   }
+  
+    if (!UserCan($user,"add-users") && !UserCan($user,"manage-users")) 
+    { 
     print h2('You do not have the required permissions to add users.');
-  } else {
+    if (defined($special) && scalar(@rows) != 0)
+    {
+        print h2('But I will let you register since you have a one time link');
+        if (!$run) 
+        { 
+            print start_form(-name=>'AddUser'),
+	         h2('Add User'),
+	         "Name: ", textfield(-name=>'name'),
+	           p,
+	           "Email: ", textfield(-name=>'email'),
+		        p,
+		        "Password: ", textfield(-name=>'password'),
+		        p,
+		        hidden(-name=>'run',-default=>['1']),
+			    hidden(-name=>'act',-default=>['add-user']),
+                hidden(-name=>'special',-default=>[$special]),
+                hidden(-name=>'refer',-default=>[$refer]),
+			    submit,
+			    end_form,
+			      hr;
+        } 
+        else 
+        {
+        my $name=param('name');
+        my $email=param('email');
+        my $password=param('password');
+        my $error;
+        $error=UserAdd($name,$password,$email,$user);
+        if ($error) 
+        { 
+	       print "Can't add user because: $error";
+        } 
+        else 
+        {
+	       print "Added user $name $email as referred by $refer\n";
+        }
+        if (scalar(@rows)!= 0 && defined($special))
+        {
+            my $error2;
+            $error2 = GiveUserPerm($name,"give-opinion-data");
+            if ($error2) 
+            { 
+	           print "Can't add permission to user because: $error2";
+            } 
+            else 
+            {
+	           print "Gave user $name permission give-opinion-data\n";
+            }
+        }
+        my $error3;
+        $error3 = LinkDel($uniqueLink);
+        if ($error3) 
+        { 
+        print "Can't delete link because: $error3";
+        } 
+        else 
+        {
+            print "Deleted link: $uniqueLink\n";
+        }
+            
+        }
+  
+    }
+    } 
+    else 
+    {
     if (!$run) { 
       print start_form(-name=>'AddUser'),
 	h2('Add User'),
@@ -536,7 +700,80 @@ if ($action eq "add-user") {
 	print "Added user $name $email as referred by $user\n";
       }
     }
-  }
+  
+    }
+
+  print "<p><a href=\"rwb.pl?act=base&run=1\">Return</a></p>";
+}
+
+#
+# INVITE-USER
+#
+# User Invite functionaltiy 
+#
+#
+#
+#
+if ($action eq "invite-user") { 
+  if (!UserCan($user,"invite-users") && !UserCan($user,"manage-users")) { 
+    print h2('You do not have the required permissions to invite users.');
+  } else {
+    if (!$run) { 
+      print start_form(-name=>'InviteUser'),
+	h2('Invite User'),
+	  "email: ", textfield(-name=>'email'),
+	    p,
+	      hidden(-name=>'run',-default=>['1']),
+		hidden(-name=>'act',-default=>['invite-user']),
+		  submit,
+		    end_form,
+		      hr;
+    } else {
+      my $email=param('email');
+      #my $password=param('password');
+      my $error;
+      my $rando = rand();
+      $rando = "$rando";
+      my $find    = '.';
+      my $replace = 'z';
+      my $pos = index($rando, $find);
+      while($pos > -1) 
+      {
+        substr($rando, $pos, length($find), $replace);
+        $pos = index($rando, $find, $pos + length($replace));
+      }
+      my $link = "https://murphy.wot.eecs.northwestern.edu/~con818/rwb/rwb.pl?act=add-user";
+      my $st = "&special=";
+      my $ref = "&refer=$user";
+      $st = "$link$st";
+      $rando = "$st$rando$ref";
+      $error=UserInvite($rando,$email);
+      if ($error) { 
+	print "Can't invite user because: $error";
+      } else {
+	print "Invited user $email\n";
+        use Net::SMTP;
+        my $smtp = Net::SMTP->new('localhost');
+        $smtp->mail('con818');
+        $smtp->to($email);
+        $smtp->data();
+        my $sendstr;
+        my $to;
+        my $blankspace;
+        $to = "To: ";
+        $blankspace = "\n";
+        $sendstr = $to.$email.$blankspace;
+        $smtp->datasend($sendstr);
+        $smtp->datasend($blankspace);
+        $smtp->datasend($rando);
+        $smtp->dataend();
+        print "sent email request to: ";
+        print $email;
+        }
+      }
+    }
+  
+  
   print "<p><a href=\"rwb.pl?act=base&run=1\">Return</a></p>";
 }
 
@@ -742,6 +979,192 @@ sub Committees {
   }
 }
 
+#
+# Generate a table of nearby committees's transaction amount
+# ($table|$raw,$error) = Committees(latne,longne,latsw,longsw,cycle,format)
+# $error false on success, error string on failure
+#
+sub CommitteesMoney {
+  my ($latne,$longne,$latsw,$longsw,$cycle,$format) = @_;
+  my @rows;
+  my $nearComm;
+  my $transCommDem;
+  my $transCommRep;
+  my $transCandDem;
+  my $transCandRep;
+  my $transCommTot;
+  my $transCandTot;
+  my @rows_comm_to_comm_dem;
+  my @rows_comm_to_comm_rep;
+  my @rows_comm_to_cand_dem;
+  my @rows_comm_to_cand_rep;
+  my @rows_comm_to_comm_tot;
+  my @rows_comm_to_cand_tot;
+  my $demTot;
+  my $repTot;
+  my $totTot;
+  my $repDemTot;
+
+  eval { 
+    # list of all the committees that can be seen in current map
+    $nearComm= "(select cmte_id,cmte_pty_affiliation from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle=$cycle and latitude>$latsw and latitude<$latne and longitude>$longsw and longitude<$longne)";
+    
+    
+    # list of all transactions for cs339.comm_to_comm natural join $nearComm
+    $transCommDem = "(SELECT transaction_amnt FROM CS339.comm_to_comm natural join $nearComm where CMTE_PTY_AFFILIATION = 'DEM')";
+   
+    $transCommRep = "(SELECT transaction_amnt FROM CS339.comm_to_comm natural join $nearComm where CMTE_PTY_AFFILIATION = 'REP')";
+    
+    $transCommTot = "(SELECT transaction_amnt FROM CS339.comm_to_comm natural join $nearComm)";
+    
+    $transCandDem = "(SELECT transaction_amnt FROM CS339.comm_to_cand natural join $nearComm where CMTE_PTY_AFFILIATION = 'DEM')";
+    
+    $transCandRep = "(SELECT transaction_amnt FROM CS339.comm_to_cand natural join $nearComm where CMTE_PTY_AFFILIATION = 'REP')";
+                
+    $transCandTot = "(SELECT transaction_amnt FROM CS339.comm_to_cand natural join $nearComm)";
+    
+    #Sum of all transactions in comm_comm table for democrats
+    @rows_comm_to_comm_dem = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM $transCommDem", "COL");
+    
+    @rows_comm_to_comm_rep = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM $transCommRep", "COL");
+    
+    @rows_comm_to_comm_tot = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM $transCommTot", "COL");
+    
+    @rows_comm_to_cand_dem = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM $transCandDem", "COL");
+    @rows_comm_to_cand_rep = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM $transCandRep", "COL");
+
+    @rows_comm_to_cand_tot = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM $transCandTot", "COL");
+  };
+  $demTot = $rows_comm_to_comm_dem[0] + $rows_comm_to_cand_dem[0];
+  $repTot = $rows_comm_to_comm_rep[0] + $rows_comm_to_cand_rep[0];
+  $repDemTot = $repTot + $demTot;
+  $totTot = $rows_comm_to_comm_tot[0] + $rows_comm_to_cand_tot[0];
+  # winner variable holds rgb value, 
+  my $winner = 'rgb(0,0,0)';
+  my $percentage = 0;
+  my $hexVal;
+  if ($demTot > $repTot)
+  {
+    $percentage = (int(($demTot-$repTot)/$repDemTot)*100);
+    $hexVal = 155+$percentage;
+    #print h2("HEXVAL: ");
+    #print h2($hexVal);
+    $winner = "rgb($hexVal,0,0)";
+  }
+  else
+  {
+    $percentage = (int(($repTot-$demTot)/$repDemTot)*100);
+    $hexVal = 155+$percentage;
+    $winner = "rgb(0,0,$hexVal)";
+  }
+  return "<h3 id ='comm' style='color:$winner'>
+  Committee Money Data <br/>
+  Democratic Committee Total Transaction Amnt: $demTot<br/>
+  Republican Committee Total Transaction Amnt: $repTot<br/>
+  Total transaction ammount regardless of political party: $totTot<br/></h3>";
+}
+
+#
+# Generate a table of nearby individuals's transaction amount
+#
+sub IndividualsMoney {
+  my ($latne,$longne,$latsw,$longsw,$cycle,$format) = @_;
+  my @rows;
+  my $nearComm;
+  my $transCommDem;
+  my $transCommRep;
+  my $transCandDem;
+  my $transCandRep;
+  my @rows_ind_dem;
+  my @rows_ind_rep;
+  my @rows_ind_tot;
+  my $totTot;
+  my $demTot;
+  my $repTot;
+
+  eval { 
+    
+    #Sum of all transactions in comm_comm table for democrats
+    @rows_ind_dem = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM (SELECT transaction_amnt FROM CS339.individual natural join (select cmte_id,cmte_pty_affiliation from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle=$cycle and latitude>$latsw and latitude<$latne and longitude>$longsw and longitude<$longne) where CMTE_PTY_AFFILIATION = 'DEM')", "COL");
+    
+    @rows_ind_rep = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM (SELECT transaction_amnt FROM CS339.individual natural join (select cmte_id,cmte_pty_affiliation from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle=$cycle and latitude>$latsw and latitude<$latne and longitude>$longsw and longitude<$longne) where CMTE_PTY_AFFILIATION = 'REP')", "COL");                             
+    
+    @rows_ind_tot = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM (SELECT transaction_amnt FROM CS339.individual natural join (select cmte_id,cmte_pty_affiliation from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle=$cycle and latitude>$latsw and latitude<$latne and longitude>$longsw and longitude<$longne))", "COL");
+  };
+  $demTot = $rows_ind_dem[0];
+  $repTot = $rows_ind_rep[0];
+  $totTot = $rows_ind_tot[0];
+  my $repDemTot = $demTot + $repTot;
+  my $hexVal;
+  my $percentage;
+  my $winner;
+  if ($demTot > $repTot)
+  {
+    $percentage = (int(($demTot-$repTot)/$repDemTot)*100);
+    $hexVal = 155+$percentage;
+    #print h2("HEXVAL: ");
+    #print h2($hexVal);
+    $winner = "rgb($hexVal,0,0)";
+  }
+  else
+  {
+    $percentage = (int(($repTot-$demTot)/$repDemTot)*100);
+    $hexVal = 155+$percentage;
+    $winner = "rgb(0,0,$hexVal)";
+  }
+  return "<h3 id='ind' style='color:$winner;'>
+  Individual Money Data <br/>
+  Democratic Individual Total Transaction Amnt: $demTot<br/>
+  Republican Individual Total Transaction Amnt: $repTot<br/>
+  Total transaction ammount regardless of political party: $totTot<br/></h3>";
+}
+
+
+#
+# Generate a table of nearby crowdsourced-opinions
+#
+sub OpinionData {
+  my ($latne,$longne,$latsw,$longsw) = @_;
+  my @rows;
+  my $nearComm;
+  my $transCommDem;
+  my $transCommRep;
+  my $transCandDem;
+  my $transCandRep;
+  my @rows_avg;
+  my @rows_std;
+  my $avgTot;
+  my $stdTot;
+
+  eval { 
+    
+    #Sum of all transactions in comm_comm table for democrats
+    @rows_avg = ExecSQL($dbuser, $dbpasswd, "SELECT AVG(COLOR) FROM rwb_opinions WHERE latitude > $latsw and latitude <$latne and longitude >$longsw and longitude <$longne", "COL");
+    
+    @rows_std = ExecSQL($dbuser, $dbpasswd, "SELECT STDDEV(COLOR) FROM rwb_opinions WHERE latitude > $latsw and latitude <$latne and longitude >$longsw and longitude <$longne", "COL");
+  };
+  $avgTot = $rows_avg[0];
+  $stdTot = $rows_std[0];
+
+  my $winner = 'white';
+  if ($avgTot > 0)
+  {
+    $winner = 'blue';
+  }
+  if ($avgTot == 0)
+  {
+    $winner = 'white';
+  }
+  if ($avgTot < 0)
+  {
+    $winner = 'red';
+  }
+  return "<h3 id='opi' style='color:$winner;'>
+  Crowd-Sourced Opinion Data Data where 1 is blue, -1 is red <br/>
+  Average Color: $avgTot<br/>
+  Standard Deviation of Color: $stdTot<br/></h3>";
+}
+
 
 #
 # Generate a table of nearby candidates
@@ -861,6 +1284,25 @@ sub UserTable {
   }
 }
 
+
+#
+# Generate a table of links
+# ($table,$error) = UserTable()
+# $error false on success, error string on failure
+#
+sub LinkTable {
+  my @rows;
+  eval { @rows = ExecSQL($dbuser, $dbpasswd, "select link, email from rwb_links order by email"); }; 
+  if ($@) { 
+    return (undef,$@);
+  } else {
+    return (MakeTable("link_table",
+		      "2D",
+		     ["Link", "Email"],
+		     @rows),$@);
+  }
+}
+
 #
 # Generate a table of users and their permissions
 # ($table,$error) = UserPermTable()
@@ -894,11 +1336,60 @@ sub UserAdd {
 }
 
 #
+# Invite a user
+# call with email
+#
+# returns false on success, error string on failure.
+# 
+# UserInvite($email)
+#
+sub UserInvite { 
+  my @rows;
+  eval { ExecSQL($dbuser,$dbpasswd,
+		 "insert into rwb_links (name,email) values (?,?)",undef,@_);};
+         
+  eval { @rows = ExecSQL($dbuser,$dbpasswd,
+		 "select * from rwb_links");};
+  #print h2(@rows);
+
+  return $@;
+}
+
+#
+# User gives opinion
+# call with color
+#
+# returns false on success, error string on failure.
+# 
+# UserGiveOpinion($submitter,$color,$latitude,$longitude)
+#
+sub UserGiveOpinion { 
+  my @rows;
+  eval { ExecSQL($dbuser,$dbpasswd,
+		 "insert into rwb_opinions (submitter,color,latitude,longitude) values (?,?,?,?)",undef,@_);};
+         
+  eval { @rows = ExecSQL($dbuser,$dbpasswd,
+		 "select * from rwb_opinions");};
+  #print h2(@rows);
+
+  return $@;
+}
+
+#
 # Delete a user
 # returns false on success, $error string on failure
 # 
 sub UserDel { 
   eval {ExecSQL($dbuser,$dbpasswd,"delete from rwb_users where name=?", undef, @_);};
+  return $@;
+}
+
+#
+# Delete a unique link
+# returns false on success, $error string on failure
+# 
+sub LinkDel { 
+  eval {ExecSQL($dbuser,$dbpasswd,"delete from rwb_links where name=?", undef, @_);};
   return $@;
 }
 
