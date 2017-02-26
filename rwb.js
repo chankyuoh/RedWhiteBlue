@@ -65,6 +65,8 @@ UpdateMapById = function(id, tag) {
 			position: new google.maps.LatLng(lat,long),
 			title: tag+"\n"+cols.join("\n")
 		}));
+        
+    
 
 	}
 },
@@ -102,7 +104,7 @@ UpdateMap = function() {
 	//UpdateMapById("candidate_data","CANDIDATE");
 	//UpdateMapById("individual_data", "INDIVIDUAL");
 	//UpdateMapById("opinion_data","OPINION");
-
+    
 // When we're done with the map update, we mark the color division as
 // Ready.
 	color.html("Ready");
@@ -114,6 +116,12 @@ UpdateMap = function() {
 	} else {
 		color.css("background-color", "red");
 	}
+    
+    var opinion = $("#opinion");
+    var opinionId = document.getElementById("opi");
+    //var data = opinionID.innerHTML;
+	opinion.css("background-color", "brown")
+		.html(opinionID.innerHTML);
 
 },
 

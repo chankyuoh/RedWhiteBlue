@@ -345,6 +345,9 @@ if ($action eq "base") {
   # And something to color (Red, White, or Blue)
   #
   print "<div id=\"color\" style=\"width:100\%; height:10\%\"></div>";
+  
+  
+  
 
   #
   #
@@ -352,7 +355,12 @@ if ($action eq "base") {
   #
   print "<div id=\"map\" style=\"width:100\%; height:80\%\"></div>";
   
-  #
+  
+    # add opinion div
+  print "<div id=\"opinion\" style=\"width:100\%; height:20\%\"></div>";
+  
+  
+
   # And a div to populate with info about nearby stuff
   #
   #
@@ -481,12 +489,13 @@ if ($action eq "near") {
       }
     }
   }
-  
-  my ($commstr) = CommitteesMoney($latne,$longne,$latsw,$longsw,$cycle,$format);
-  my ($indstr) = IndividualsMoney($latne,$longne,$latsw,$longsw,$cycle,$format);
+  #commented out for now b/c causing crash
+  #my ($commstr) = CommitteesMoney($latne,$longne,$latsw,$longsw,$cycle,$format);
+  #my ($indstr) = IndividualsMoney($latne,$longne,$latsw,$longsw,$cycle,$format);
   my ($opinionstr) = OpinionData($latne,$longne,$latsw,$longsw);
-  print $commstr;
-  print $indstr;
+  #print $commstr;
+
+  #print $indstr;
   print $opinionstr;
 }
 
