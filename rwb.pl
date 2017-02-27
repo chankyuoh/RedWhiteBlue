@@ -370,7 +370,7 @@ if ($action eq "base") {
  checkbox(-name=>'Candidates', -id=>'candidates_id', -checked=>'true',-onclick=>'ViewShift()'),p,
   end_form;
   
- print "<div id=\"comm\" style=\"width:100\%; height:10\%\">hello</div>";
+ print "<div id=\"comm\" style=\"width:100\%; height:10\%\"></div>";
   
 
   # And a div to populate with info about nearby stuff
@@ -468,6 +468,8 @@ if ($action eq "near") {
 	print $str;
       }
     }
+      my ($commstr) = CommitteesMoney($latne,$longne,$latsw,$longsw,$cycle,$format);
+      print $commstr;
   }
   if ($what{candidates}) {
     my ($str,$error) = Candidates($latne,$longne,$latsw,$longsw,$cycle,$format);
@@ -488,6 +490,8 @@ if ($action eq "near") {
 	print $str;
       }
     }
+     my ($indstr) = IndividualsMoney($latne,$longne,$latsw,$longsw,$cycle,$format);
+     print $indstr;
   }
   if ($what{opinions}) {
     my ($str,$error) = Opinions($latne,$longne,$latsw,$longsw,$cycle,$format);
@@ -498,14 +502,10 @@ if ($action eq "near") {
 	print $str;
       }
     }
+    my ($opinionstr) = OpinionData($latne,$longne,$latsw,$longsw);
+    print $opinionstr;
   }
   
-  my ($commstr) = CommitteesMoney($latne,$longne,$latsw,$longsw,$cycle,$format);
-  my ($indstr) = IndividualsMoney($latne,$longne,$latsw,$longsw,$cycle,$format);
-  my ($opinionstr) = OpinionData($latne,$longne,$latsw,$longsw);
-  print $commstr;
-  print $indstr;
-  print $opinionstr;
 }
 
 
@@ -1017,10 +1017,14 @@ sub CommitteesMoney {
   my $repTot;
   my $totTot;
   my $repDemTot;
-
-  eval { 
+  my $counter = 0;
+  my $needMoreData = 1;
+  
+  while ($counter < 5 && $needMoreData)
+  {
+   eval { 
     # list of all the committees that can be seen in current map
-    $nearComm= "(select cmte_id,cmte_pty_affiliation from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle=$cycle and latitude>$latsw and latitude<$latne and longitude>$longsw and longitude<$longne)";
+    $nearComm= "(select cmte_id,cmte_pty_affiliation from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle in ($cycle) and latitude>$latsw and latitude<$latne and longitude>$longsw and longitude<$longne)";
     
     
     # list of all transactions for cs339.comm_to_comm natural join $nearComm
@@ -1048,8 +1052,22 @@ sub CommitteesMoney {
 
     @rows_comm_to_cand_tot = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM $transCandTot", "COL");
   };
+
   $demTot = $rows_comm_to_comm_dem[0] + $rows_comm_to_cand_dem[0];
   $repTot = $rows_comm_to_comm_rep[0] + $rows_comm_to_cand_rep[0];
+  if ($demTot != 0  && $repTot != 0)
+  {
+    $needMoreData = 0;
+  }
+  else
+  {
+    $latsw = $latsw-.1;
+    $longsw = $longsw-.1;
+    $latne = $latne+.1;
+    $longne = $longne+.1;
+  }
+  $counter = $counter + 1;
+  }
   $repDemTot = $repTot + $demTot;
   $totTot = $rows_comm_to_comm_tot[0] + $rows_comm_to_cand_tot[0];
   # winner variable holds rgb value, 
@@ -1094,16 +1112,37 @@ sub IndividualsMoney {
   my $totTot;
   my $demTot;
   my $repTot;
+  my $counter = 0;
+  my $needMoreData = 1;
+  
+  while ($counter < 5 && $needMoreData)
+  {
 
   eval { 
     
     #Sum of all transactions in comm_comm table for democrats
-    @rows_ind_dem = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM (SELECT transaction_amnt FROM CS339.individual natural join (select cmte_id,cmte_pty_affiliation from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle=$cycle and latitude>$latsw and latitude<$latne and longitude>$longsw and longitude<$longne) where CMTE_PTY_AFFILIATION = 'DEM')", "COL");
+    @rows_ind_dem = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM (SELECT transaction_amnt FROM CS339.individual natural join (select cmte_id,cmte_pty_affiliation from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle in ($cycle) and latitude>$latsw and latitude<$latne and longitude>$longsw and longitude<$longne) where CMTE_PTY_AFFILIATION = 'DEM')", "COL");
     
-    @rows_ind_rep = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM (SELECT transaction_amnt FROM CS339.individual natural join (select cmte_id,cmte_pty_affiliation from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle=$cycle and latitude>$latsw and latitude<$latne and longitude>$longsw and longitude<$longne) where CMTE_PTY_AFFILIATION = 'REP')", "COL");                             
+    @rows_ind_rep = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM (SELECT transaction_amnt FROM CS339.individual natural join (select cmte_id,cmte_pty_affiliation from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle in ($cycle) and latitude>$latsw and latitude<$latne and longitude>$longsw and longitude<$longne) where CMTE_PTY_AFFILIATION = 'REP')", "COL");                             
     
-    @rows_ind_tot = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM (SELECT transaction_amnt FROM CS339.individual natural join (select cmte_id,cmte_pty_affiliation from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle=$cycle and latitude>$latsw and latitude<$latne and longitude>$longsw and longitude<$longne))", "COL");
+    @rows_ind_tot = ExecSQL($dbuser, $dbpasswd, "SELECT SUM(TRANSACTION_AMNT) FROM (SELECT transaction_amnt FROM CS339.individual natural join (select cmte_id,cmte_pty_affiliation from cs339.committee_master natural join cs339.cmte_id_to_geo where cycle in ($cycle) and latitude>$latsw and latitude<$latne and longitude>$longsw and longitude<$longne))", "COL");
   };
+  
+    $demTot = $rows_ind_dem[0];
+    $repTot = $rows_ind_rep[0];
+    if ($demTot != 0 && $repTot !=0)
+    {
+        $needMoreData = 0;
+    }
+    else
+    {
+        $latsw = $latsw-.1;
+        $longsw = $longsw-.1;
+        $latne = $latne+.1;
+        $longne = $longne+.1;
+    }
+    $counter = $counter + 1;
+  }
   $demTot = $rows_ind_dem[0];
   $repTot = $rows_ind_rep[0];
   $totTot = $rows_ind_tot[0];
@@ -1148,7 +1187,13 @@ sub OpinionData {
   my @rows_std;
   my $avgTot;
   my $stdTot;
-
+  my $counter = 0;
+  my $needMoreData = 1;
+  
+  
+  while ($counter < 5 && $needMoreData)
+  {
+  
   eval { 
     
     #Sum of all transactions in comm_comm table for democrats
@@ -1156,6 +1201,21 @@ sub OpinionData {
     
     @rows_std = ExecSQL($dbuser, $dbpasswd, "SELECT STDDEV(COLOR) FROM rwb_opinions WHERE latitude > $latsw and latitude <$latne and longitude >$longsw and longitude <$longne", "COL");
   };
+    $avgTot = $rows_avg[0];
+    $stdTot = $rows_std[0];
+    if ($avgTot != 0 && $stdTot != 0)
+    {
+        $needMoreData = 0;
+    }
+    else
+    {
+        $latsw = $latsw-.1;
+        $longsw = $longsw-.1;
+        $latne = $latne+.1;
+        $longne = $longne+.1;
+    }
+    $counter = $counter + 1;
+  }
   $avgTot = $rows_avg[0];
   $stdTot = $rows_std[0];
 
